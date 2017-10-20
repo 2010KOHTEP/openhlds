@@ -40,7 +40,9 @@ var
 
 implementation
 
-uses Common, Console, Edict, FilterIP, GameLib, Host, Info, Memory, MsgBuf, Network, Resource, SVAuth, SVClient, SVDelta, SVEvent, SVMain, SVRcon, SVSend;
+uses Common, Console, Edict, FilterIP, GameLib, Host, Info, Memory, MsgBuf,
+  Network, Resource, SVAuth, SVClient, SVDelta, SVEvent, SVMain, SVRcon, SVSend,
+  SVMaster, SVSteam;
 
 const
  MAX_CHALLENGES = 1024;
@@ -213,8 +215,36 @@ if not Result then
 end;
 
 function SV_FinishCertificateCheck(const Addr: TNetAdr; Prot: UInt; CDKey: PLChar; UserInfo: PLChar): Boolean;
+var
+  S: PLChar;
 begin
-Result := True;
+  if Prot = 2 then
+  begin
+    if StrLen(CDKey) <> DEFAULT_CDKEY_LENGTH then
+    begin
+      SV_RejectConnection(Addr, 'Invalid CD Key.'#10);
+      Exit(False);
+    end;
+
+    if Addr.AddrType <> NA_LOOPBACK then
+    begin
+      S := Info_ValueForKey(UserInfo, '*hltv');
+
+      if (StrLen(S) = 0) or (StrToInt(S) <> 1) then
+      begin
+        SV_RejectConnection(Addr, 'Invalid CD Key.'#10);
+        Exit(False);
+      end;
+    end;
+  end
+  else
+  if StrIComp(CDKey, 'steam') = 0 then
+  begin
+    SV_RejectConnection(Addr, 'Expecting STEAM authentication USERID ticket!'#10);
+    Exit(False);
+  end;
+
+  Exit(True);
 end;
 
 function SV_CheckKeyInfo(const Addr: TNetAdr; ProtInfo: PLChar; out Prot: UInt; AuthHash, CDKey: PLChar): Boolean;
